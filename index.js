@@ -1,22 +1,21 @@
 require('dotenv').config();
-const { App } = require('@slack/bolt');
+const { App, ExpressReceiver } = require('@slack/bolt');
 const axios = require('axios');
 const moment = require('moment');
-const express = require('express'); // 追加
+
+// ExpressReceiverを使ってExpressアプリを作成
+const receiver = new ExpressReceiver({
+    signingSecret: process.env.SLACK_SIGNING_SECRET
+});
 
 const TODOIST_API_TOKEN = process.env.TODOIST_API_TOKEN;
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
-const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 const POST_CHANNEL = process.env.SLACK_POST_CHANNEL;
 
 const app = new App({
     token: SLACK_BOT_TOKEN,
-    signingSecret: SLACK_SIGNING_SECRET
+    receiver // ExpressReceiverを指定
 });
-
-// Expressアプリの作成
-const server = express();
-const port = process.env.PORT || 3000;
 
 // Function to fetch tasks from Todoist
 async function fetchTasks() {
@@ -62,7 +61,7 @@ function formatMessage(tasks) {
     if (overdue.length > 0) {
         text += '*Overdue Tasks:*\n';
         overdue.forEach(task => {
-            text += ` * ${task.content} (Due: ${moment(task.due.date).format('YYYY-MM-DD')})\n`; // 修正: task.due.date を使用
+            text += ` * ${task.content} (Due: ${moment(task.due.date).format('YYYY-MM-DD')})\n`;
         });
         text += '\n';
     }
@@ -205,17 +204,13 @@ app.view('submit_comment', async ({ ack, body, view, client }) => {
 });
 
 // Expressエンドポイントの設定
-server.get('/send-tasks', async (req, res) => {
+receiver.router.get('/send-tasks', async (req, res) => {
     await sendTasksToSlack();
     res.send('Tasks sent to Slack.');
 });
 
 // サーバーの起動
 (async () => {
-    await app.start(process.env.PORT || 3000);
+    await app.start();
     console.log('⚡️ Slack app is running!');
-
-    server.listen(port, () => {
-        console.log(`🌐 Server is running on http://localhost:${port}`);
-    });
 })();
