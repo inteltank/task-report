@@ -2,6 +2,7 @@ require('dotenv').config();
 const { App } = require('@slack/bolt');
 const axios = require('axios');
 const moment = require('moment');
+const express = require('express'); // 追加
 
 const TODOIST_API_TOKEN = process.env.TODOIST_API_TOKEN;
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
@@ -13,6 +14,9 @@ const app = new App({
     signingSecret: SLACK_SIGNING_SECRET
 });
 
+// Expressアプリの作成
+const server = express();
+const port = process.env.PORT || 3000;
 
 // Function to fetch tasks from Todoist
 async function fetchTasks() {
@@ -31,7 +35,6 @@ async function fetchTasks() {
 
 // Function to categorize tasks
 function categorizeTasks(tasks) {
-
     const today = moment().startOf('day');
     const tomorrow = moment().add(1, 'day').startOf('day');
 
@@ -42,7 +45,6 @@ function categorizeTasks(tasks) {
 
     return { completedToday, overdue, dueTomorrow };
 }
-
 
 // Function to format the Slack message with a button to open a modal
 function formatMessage(tasks) {
@@ -99,7 +101,6 @@ function formatMessage(tasks) {
         ]
     };
 }
-
 
 // Function to send tasks to Slack with interactivity
 async function sendTasksToSlack() {
@@ -203,14 +204,18 @@ app.view('submit_comment', async ({ ack, body, view, client }) => {
     }
 });
 
+// Expressエンドポイントの設定
+server.get('/send-tasks', async (req, res) => {
+    await sendTasksToSlack();
+    res.send('Tasks sent to Slack.');
+});
 
-
-
-// Start the app
+// サーバーの起動
 (async () => {
     await app.start(process.env.PORT || 3000);
     console.log('⚡️ Slack app is running!');
-})();
 
-// Send tasks to Slack on startup
-sendTasksToSlack();
+    server.listen(port, () => {
+        console.log(`🌐 Server is running on http://localhost:${port}`);
+    });
+})();
